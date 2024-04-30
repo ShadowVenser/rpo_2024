@@ -21,7 +21,7 @@ import org.apache.commons.codec.Decoder;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements TransactionEvents{
 
     // Used to load the 'fclient' library on application startup.
     static {
@@ -32,6 +32,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     private Button btnClick;
     private ActivityResultLauncher activityResultLauncher;
+    private String pin;
 
 
     @Override
@@ -53,8 +54,23 @@ public class MainActivity extends AppCompatActivity {
         btnClick.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent it = new Intent(v.getContext(), PinpadActivity.class);
-                activityResultLauncher.launch(it);
+                byte[] trd = strToHex("9F0206000000000100");
+                transaction(trd);
+
+                /*new Thread(() -> {
+                    try {
+                        byte[] trd = strToHex("9F0206000000000100");
+                        boolean ok = transaction(trd);
+                        runOnUiThread(() -> {
+                            Toast.makeText(MainActivity.this, ok ? "Ok" : "Failed!", Toast.LENGTH_LONG).show();
+                        });
+                    } catch (Exception e) {
+                        logError("Transaction exception: " + e.getMessage());
+                    }
+                }).start();*/
+
+                //Intent it = new Intent(v.getContext(), PinpadActivity.class);
+                //activityResultLauncher.launch(it);
 
 /*              byte[] key = strToHex("0123456789ABCDEF0123456789ABCDE0");
                 byte[] enc = encrypt(key, strToHex("1234"));
@@ -70,11 +86,14 @@ public class MainActivity extends AppCompatActivity {
                     public void onActivityResult(ActivityResult res) {
                         if (res.getResultCode() == Activity.RESULT_OK) {
                             Intent data = res.getData();
-                            String pin = data.getStringExtra("pin");
-                            Toast.makeText(MainActivity.this, pin, Toast.LENGTH_SHORT).show();
+                            pin = data.getStringExtra("pin");
+                            synchronized (MainActivity.this) {
+                                MainActivity.this.notifyAll();
+                            }
                         }
                     }
                 });
+        stringFromJNI();
     }
 
     public static byte[] strToHex(String str){
@@ -87,6 +106,29 @@ public class MainActivity extends AppCompatActivity {
         }
         return hex;
     }
+    @Override
+    public String enterPin(int ptc, String amount){
+        pin = "None";
+        Intent enter = new Intent(MainActivity.this, PinpadActivity.class);
+        enter.putExtra("ptc", ptc);
+        enter.putExtra("amount", amount);
+        synchronized (MainActivity.this) {
+            activityResultLauncher.launch(enter);
+            try {
+                MainActivity.this.wait();
+            } catch (InterruptedException e) {
+                logError("Interrupted exception: " + e.getMessage());
+            }
+        }
+        return pin;
+    }
+
+    @Override
+    public void transactionResult(boolean result) {
+        runOnUiThread(()-> {
+            Toast.makeText(MainActivity.this, result ? "ok" : "failed", Toast.LENGTH_SHORT).show();
+        });
+    }
 
     /**
      * A native method that is implemented by the 'fclient' native library,
@@ -94,6 +136,7 @@ public class MainActivity extends AppCompatActivity {
      */
     public native String stringFromJNI();
 
+    public static native void logError(String message);
     public static native int initRng();
 
     public static native byte[] randomBytes(int no);
@@ -101,4 +144,6 @@ public class MainActivity extends AppCompatActivity {
     public static native byte[] encrypt(byte[] key, byte[] data);
 
     public static native byte[] decrypt(byte[] key, byte[] data);
+
+    public native boolean transaction(byte[] trd);
 }

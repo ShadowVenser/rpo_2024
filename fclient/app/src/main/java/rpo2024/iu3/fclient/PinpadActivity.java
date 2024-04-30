@@ -1,11 +1,15 @@
 package rpo2024.iu3.fclient;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
+import android.icu.text.DecimalFormat;
+import android.icu.text.UFormat;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,16 +20,47 @@ import androidx.core.view.WindowInsetsCompat;
 public class PinpadActivity extends AppCompatActivity {
 
 
-    TextView tvPin;
+    TextView txtPin;
+    TextView txtPtc;
+    TextView txtAmount;
     String pin = "";
     final int MAX_KEYS = 10;
 
+    @SuppressLint({"DefaultLocale", "SetTextI18n"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pinpad);
 
-        tvPin = findViewById(R.id.txtPin);
+        txtPin = findViewById(R.id.txtPin);
+        txtAmount = (TextView) findViewById(R.id.txtAmount);
+        txtPtc = (TextView) findViewById(R.id.txtPtc);
+
+        String amount = String.valueOf(getIntent().getStringExtra("amount"));
+        Long amount_val = Long.valueOf(amount);
+        DecimalFormat amount_format = new DecimalFormat("#,###,###,##0.00");
+        txtAmount.setText("Сумма: " + amount_format.format(amount_val));
+
+        int ptc = getIntent().getIntExtra("ptc", 0);
+        String ptcText = "";
+        switch (ptc) {
+            case (0): {
+                ptcText = "Попыток не осталось";
+                Toast.makeText(this, ptcText, Toast.LENGTH_LONG).show();
+                finish();
+                break;
+            }
+            case (1): {
+                ptcText = "Осталась одна попытка";
+                break;
+            }
+            default: {
+                ptcText = String.format("Осталось %d попыток", ptc);
+                break;
+            }
+        }
+        txtPtc.setText(ptcText);
+
 
         ShuffleKeys();
 
@@ -38,7 +73,7 @@ public class PinpadActivity extends AppCompatActivity {
 
         findViewById(R.id.btnReset).setOnClickListener((View) -> {
             pin = "";
-            tvPin.setText("");
+            txtPin.setText("");
         });
     }
 
@@ -50,7 +85,7 @@ public class PinpadActivity extends AppCompatActivity {
         if (sz < 4)
         {
             pin += key;
-            tvPin.setText("****".substring(3 - sz));
+            txtPin.setText("****".substring(3 - sz));
         }
     }
 

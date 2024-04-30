@@ -15,10 +15,43 @@ char *personalization = "fclient-sample-app";
 
 #define LOF_INFO(...) __android_log_print(ANDROID_LOG_INFO, "fclient_ndk", __VA_ARGS__)
 #define SLOG_INFO(...) android_logger->info( __VA_ARGS__ )
+
 auto android_logger = spdlog::android_logger_mt("android", "fclient_ndk");
 
-extern "C" JNIEXPORT jstring
+JavaVM* gJvm = nullptr;
 
+JNIEXPORT jint JNICALL JNI_OnLoad (JavaVM* pjvm, void* reserved)
+{
+    gJvm = pjvm;
+    return JNI_VERSION_1_6;
+}
+
+JNIEnv* getEnv (bool& detach)
+{
+    JNIEnv* env = nullptr;
+    int status = gJvm->GetEnv ((void**)&env, JNI_VERSION_1_6);
+    detach = false;
+    if (status == JNI_EDETACHED)
+    {
+        status = gJvm->AttachCurrentThread (&env, NULL);
+        if (status < 0)
+        {
+            return nullptr;
+        }
+        detach = true;
+    }
+    return env;
+}
+
+void releaseEnv (bool detach, JNIEnv* env)
+{
+    if (detach && (gJvm != nullptr))
+    {
+        gJvm->DetachCurrentThread ();
+    }
+}
+
+extern "C" JNIEXPORT jstring
 JNICALL
 Java_rpo2024_iu3_fclient_MainActivity_stringFromJNI(
         JNIEnv *env,
@@ -29,6 +62,22 @@ Java_rpo2024_iu3_fclient_MainActivity_stringFromJNI(
     SLOG_INFO("Hello from spdlog {0}", 2024);
     return env->NewStringUTF(hello.c_str());
 }
+
+extern "C" JNIEXPORT void
+
+JNICALL
+Java_rpo2024_iu3_fclient_MainActivity_logError(
+        JNIEnv *env,
+        jclass,
+        jstring message) {
+    const char * msg = env->GetStringUTFChars(message, nullptr);
+    spdlog::set_pattern("[%n] [%l] %v");
+    android_logger->set_level(spdlog::level::err);
+    android_logger->error("{0}", msg);
+    android_logger->set_level(spdlog::level::info);
+    delete[] msg;
+}
+
 
 extern "C" JNIEXPORT jint JNICALL
 Java_rpo2024_iu3_fclient_MainActivity_initRng(
@@ -127,4 +176,48 @@ Java_rpo2024_iu3_fclient_MainActivity_decrypt(
     env->ReleaseByteArrayElements(key, pkey, 0);
     env->ReleaseByteArrayElements(data, pdata, 0);
     return dout;
+}
+extern "C"
+JNIEXPORT jboolean JNICALL
+Java_rpo2024_iu3_fclient_MainActivity_transaction(JNIEnv *xenv, jobject xthiz, jbyteArray xtrd) {
+    jobject thiz = xenv->NewGlobalRef(xthiz);
+    jbyteArray trd = (jbyteArray) xenv->NewGlobalRef(xtrd);
+    std::thread t([thiz, trd] {
+        bool detach = false;
+        JNIEnv *env = getEnv(detach);
+        jclass cls = env->GetObjectClass(thiz);
+        jmethodID id = env->GetMethodID(cls, "enterPin", "(ILjava/lang/String;)Ljava/lang/String;");
+        uint8_t * p = (uint8_t*) env->GetByteArrayElements(trd, 0);
+        jsize sz = env->GetArrayLength(trd);
+        if ((sz != 9) || (p[0] != 0x9F) || (p[1] != 0x02) || (p[2] != 0x06)) {
+            return false;
+        }
+        char buffer[13];
+        for (int i = 0; i < 6; i++) {
+            uint8_t num = *(p + 3 + i);
+            buffer[i*2] = ((num & 0xF0) >> 4) + '0';
+            buffer[i*2+1] = (num & 0x0F) + '0';
+        }
+        buffer[12] = 0x00;
+        jstring jamount = (jstring) env->NewStringUTF(buffer);
+        int ptc = 3;
+        while (ptc > 0) {
+            jstring pin = (jstring) env->CallObjectMethod(thiz, id, ptc, jamount);
+            const char * utf = env->GetStringUTFChars(pin, nullptr);
+            env->ReleaseStringUTFChars(pin, utf);
+            if ((utf != nullptr) && (strcmp(utf, "1234") == 0)) break;
+            ptc--;
+        }
+
+        id = env->GetMethodID(cls, "transactionResult", "(Z)V");
+        env->CallVoidMethod(thiz, id, ptc > 0);
+
+        env->ReleaseByteArrayElements(trd, (jbyte *)p, 0);
+        env->DeleteGlobalRef(thiz);
+        env->DeleteGlobalRef(trd);
+        releaseEnv(detach, env);
+        return true;
+    });
+    t.detach();
+    return true;
 }
