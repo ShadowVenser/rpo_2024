@@ -11,6 +11,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.DeadObjectException;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -20,6 +21,13 @@ import rpo2024.iu3.fclient.databinding.ActivityMainBinding;
 import org.apache.commons.codec.Decoder;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.IOUtils;
+
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity implements TransactionEvents{
 
@@ -33,6 +41,41 @@ public class MainActivity extends AppCompatActivity implements TransactionEvents
     private Button btnClick;
     private ActivityResultLauncher activityResultLauncher;
     private String pin;
+
+
+    protected void testHttpClient()
+    {
+        new Thread(() -> {
+            try {
+                HttpURLConnection uc = (HttpURLConnection)
+                        (new URL("http://10.0.2.2:8080/api/v1/title").openConnection());
+                InputStream inputStream = uc.getInputStream();
+                String html = IOUtils.toString(inputStream);
+                String title = getPageTitle(html);
+                runOnUiThread(() ->
+                {
+                    Toast.makeText(this, title, Toast.LENGTH_LONG).show();
+                });
+
+            } catch (Exception ex) {
+                Log.e("fapptag", "Http client fails", ex);
+            }
+        }).start();
+    }
+
+
+    protected String getPageTitle(String html)
+    {
+        Pattern pattern = Pattern.compile("<title>(.+?)</title>", Pattern.DOTALL);
+        Matcher matcher = pattern.matcher(html);
+        String p;
+        if (matcher.find())
+            p = matcher.group(1);
+        else
+            p = "Not found";
+        return p;
+    }
+
 
 
     @Override
@@ -54,8 +97,10 @@ public class MainActivity extends AppCompatActivity implements TransactionEvents
         btnClick.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                byte[] trd = strToHex("9F0206000000000100");
-                transaction(trd);
+                testHttpClient();
+
+                /*byte[] trd = strToHex("9F0206000000000100");
+                transaction(trd);*/
 
                 /*new Thread(() -> {
                     try {
@@ -69,8 +114,8 @@ public class MainActivity extends AppCompatActivity implements TransactionEvents
                     }
                 }).start();*/
 
-                //Intent it = new Intent(v.getContext(), PinpadActivity.class);
-                //activityResultLauncher.launch(it);
+                /*Intent it = new Intent(v.getContext(), PinpadActivity.class);
+                activityResultLauncher.launch(it);*/
 
 /*              byte[] key = strToHex("0123456789ABCDEF0123456789ABCDE0");
                 byte[] enc = encrypt(key, strToHex("1234"));
