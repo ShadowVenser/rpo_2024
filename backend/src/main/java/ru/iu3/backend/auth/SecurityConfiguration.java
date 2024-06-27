@@ -33,6 +33,9 @@ public class SecurityConfiguration {
             new AntPathRequestMatcher("/api/**")
     );
 
+    private static final RequestMatcher LOGOUT_URL = new OrRequestMatcher(
+            new AntPathRequestMatcher("/auth/logout")
+    );
     AuthenticationProvider provider;
 
     @Autowired
@@ -59,8 +62,9 @@ public class SecurityConfiguration {
                 .sessionManagement((session) -> session
                         .sessionCreationPolicy(SessionCreationPolicy.NEVER))
                 .addFilterBefore(authenticationFilter(), AnonymousAuthenticationFilter.class)
+                .addFilterBefore(authenticationLogoutFilter(), AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests((authz) -> authz
-                        .requestMatchers(PROTECTED_URLS)
+                        .requestMatchers(PROTECTED_URLS, LOGOUT_URL)
                         .authenticated())
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -78,9 +82,16 @@ public class SecurityConfiguration {
         return (web) -> web.ignoring().requestMatchers(new AntPathRequestMatcher("/auth/login"));
     }
 
-
+    @Bean
     AuthenticationFilter authenticationFilter() throws Exception {
         AuthenticationFilter filter = new AuthenticationFilter(PROTECTED_URLS);
+        filter.setAuthenticationManager(authenticationConfiguration.getAuthenticationManager());
+        return filter;
+    }
+
+    @Bean
+    AuthenticationFilter authenticationLogoutFilter() throws Exception {
+        AuthenticationFilter filter = new AuthenticationFilter(LOGOUT_URL);
         filter.setAuthenticationManager(authenticationConfiguration.getAuthenticationManager());
         return filter;
     }
