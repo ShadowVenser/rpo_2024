@@ -64,7 +64,7 @@ public class SecurityConfiguration {
                 .addFilterBefore(authenticationFilter(), AnonymousAuthenticationFilter.class)
                 .addFilterBefore(authenticationLogoutFilter(), AnonymousAuthenticationFilter.class)
                 .authorizeHttpRequests((authz) -> authz
-                        .requestMatchers(PROTECTED_URLS, LOGOUT_URL)
+                        .requestMatchers(PROTECTED_URLS,LOGOUT_URL)
                         .authenticated())
                 .csrf(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -79,7 +79,8 @@ public class SecurityConfiguration {
 
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
-        return (web) -> web.ignoring().requestMatchers(new AntPathRequestMatcher("/auth/login"));
+        return (web) -> web.ignoring().requestMatchers(
+                new AntPathRequestMatcher("/auth/login"));
     }
 
     @Bean
