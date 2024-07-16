@@ -53,7 +53,7 @@ class NavigationBarClass extends React.Component {
                         {/*<Nav.Link onClick={() => { this.props.history.push("/home")}} >Yet another home</Nav.Link>*/}
                     </Nav>
                 </Navbar.Collapse>
-                <Navbar.Text>{this.props.user && this.props.user.login}</Navbar.Text>
+                <Nav.Link as={Link} to="/account">{this.props.user && this.props.user.login}</Nav.Link>
                 { this.props.user &&
                     <Nav.Link onClick={this.logout}><FontAwesomeIcon icon={faUser} fixedWidth />{' '}Выход</Nav.Link>
                 }

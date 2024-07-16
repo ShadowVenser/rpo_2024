@@ -9,14 +9,23 @@ import {connect} from "react-redux";
 import SideBar from "./components/SideBar";
 import CountryListComponent from "./components/lists/CountryListComponent";
 import CountryComponent from "./components/CountryComponent";
-
+import ArtistListComponent from "./components/lists/ArtistListComponent";
+import ArtistComponent from "./components/ArtistComponent";
+import MuseumListComponent from "./components/lists/MuseumListComponent";
+import MuseumComponent from "./components/MuseumComponent";
+import MyAccountComponent from "./components/MyAccountComponent";
+import UsersListComponent from "./components/lists/UserListComponent";
+import PaintingsListComponent from "./components/lists/PaintingsListComponent";
+import PaintingComponent from "./components/PaintingComponent";
 
 const ProtectedRoute = ({children}) => {
     let user = Utils.getUser();
     return user ? children : <Navigate to={'/login'} />
 };
 
-        
+
+
+
 const App = props => {
 
     const [exp,setExpanded] = useState(true);
@@ -32,8 +41,17 @@ const App = props => {
                         <Routes>
                             <Route path="login" element={<Login />}/>
                             <Route path="home" element={<ProtectedRoute><Home/></ProtectedRoute>}/>
+                            <Route path="account" element={<ProtectedRoute><MyAccountComponent/></ProtectedRoute>}/>
                             <Route path="countries" element={<ProtectedRoute><CountryListComponent/></ProtectedRoute>}/>
                             <Route path="countries/:id" element={<ProtectedRoute><CountryComponent /></ProtectedRoute>}/>
+                            <Route path="artists" element={<ProtectedRoute><ArtistListComponent/></ProtectedRoute>}/>
+                            <Route path="artists/:id" element={<ProtectedRoute><ArtistComponent /></ProtectedRoute>}/>
+                            <Route path="museums" element={<ProtectedRoute><MuseumListComponent/></ProtectedRoute>}/>
+                            <Route path="museums/:id" element={<ProtectedRoute><MuseumComponent /></ProtectedRoute>}/>
+                             <Route path="paintings" element={<ProtectedRoute><PaintingsListComponent/></ProtectedRoute>}/>
+                            <Route path="paintings/:id" element={<ProtectedRoute><PaintingComponent /></ProtectedRoute>}/><
+                            Route path="users" element={<ProtectedRoute><UsersListComponent/></ProtectedRoute>}/>
+
                         </Routes>
                     </div>
                 </div>
@@ -41,7 +59,7 @@ const App = props => {
         </div>
     );
 }
-            
+
 
 
 function mapStateToProps(state) {

@@ -34,7 +34,9 @@ export default connect()(function  Login() {
             setLoggingIn(true);
             BackendService.login(username, password)
                 .then ( resp => {
+                    console.log("start user");
                     console.log(resp.data);
+                    console.log("end user")
                     setLoggingIn(false);
                     dispatch(userActions.login(resp.data))
                     nav("/home");
