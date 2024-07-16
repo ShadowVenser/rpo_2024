@@ -1,97 +1,98 @@
 package ru.iu3.backend.controllers;
 
-import com.fasterxml.jackson.annotation.JsonView;
-import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 import ru.iu3.backend.models.Artist;
 import ru.iu3.backend.models.Country;
 import ru.iu3.backend.models.Museum;
 import ru.iu3.backend.models.User;
+import ru.iu3.backend.tools.Utils;
+import ru.iu3.backend.repositories.ArtistRepository;
 import ru.iu3.backend.repositories.CountryRepository;
 import ru.iu3.backend.repositories.MuseumRepository;
 import ru.iu3.backend.repositories.UserRepository;
-import ru.iu3.backend.tools.View;
+import ru.iu3.backend.tools.DataValidationException;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.codec.Hex;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
 
 
 import java.util.*;
 
-@CrossOrigin(origins = "http://localhost:3000")
 @RestController
+@CrossOrigin(origins = "http://localhost:3000")
 @RequestMapping("/api/v1")
 public class UserController {
+
     @Autowired
     UserRepository userRepository;
-
     @Autowired
     MuseumRepository museumRepository;
 
     @GetMapping("/users")
-    @JsonView(View.Req.class)
-    public List
-    getAllUsers() {
-        return userRepository.findAll();
+    public Page<User> getAllUsers(@RequestParam("page") int page, @RequestParam("limit") int limit) {
+        return userRepository.findAll(PageRequest.of(page, limit, Sort.by(Sort.Direction.ASC, "login")));
     }
 
-    @GetMapping("/users/{id}/museums")
-    public ResponseEntity<Set<Museum>> getUsersMuseums(@PathVariable(value = "id") Long userID) {
-        Optional<User> cc = userRepository.findById(userID);
-        if (cc.isPresent()) {
-            return ResponseEntity.ok(cc.get().museums);
+    @PutMapping("/users/{token}")
+    public ResponseEntity<User> updateUser(@PathVariable(value = "token") String userToken,
+                                           @RequestBody User userDetails)
+            throws DataValidationException
+    {
+        try {
+            User user = userRepository.findByToken(userToken)
+                    .orElseThrow(() -> new DataValidationException(" Пользователь с таким индексом не найден"));
+            user.email = userDetails.email;
+            String np = userDetails.np;
+            if (np != null  && !np.isEmpty()) {
+                byte[] b = new byte[32];
+                new Random().nextBytes(b);
+                String salt = new String(Hex.encode(b));
+                user.password = Utils.ComputeHash(np, salt);
+                user.salt = salt;
+            }
+            userRepository.save(user);
+            return ResponseEntity.ok(user);
         }
-        return ResponseEntity.ok(new HashSet<Museum>());
+        catch (Exception ex) {
+            String error;
+            if (ex.getMessage().contains("users.email_UNIQUE"))
+                throw new DataValidationException("Пользователь с такой почтой уже есть в базе");
+            else
+                throw new DataValidationException("Неизвестная ошибка");
+        }
     }
 
     @PostMapping("/users")
-    @JsonView(View.Req.class)
     public ResponseEntity<Object> createUser(@RequestBody User user)
             throws Exception {
         try {
             User nc = userRepository.save(user);
+            System.out.println(nc.login);
             return new ResponseEntity<Object>(nc, HttpStatus.OK);
-        }
-        catch(Exception ex) {
+        } catch (Exception ex) {
             String error;
-            if (ex.getMessage().contains("UNIQUE"))
-                error = "UserAlreadyExists";
-            else if (ex.getMessage().contains("not-null"))
-                error = "NullVariableError";
+            if (ex.getMessage().contains("users.name_UNIQUE"))
+                error = "useralreadyexists";
             else
-                error = "UndefinedError";
+                error = "undefinederror";
             Map<String, String>
-                    map =  new HashMap<>();
+                    map = new HashMap<>();
             map.put("error", error);
-            return ResponseEntity.ok(map);
+            return new ResponseEntity<Object>(map, HttpStatus.OK);
         }
     }
-
-
-    @PutMapping("/users/{id}")
-    @JsonView(View.Req.class)
-    public ResponseEntity<User> updateUser(@PathVariable(value = "id") Long userID,
-                                                 @RequestBody User userDetails) {
-        User user = null;
-        Optional<User>
-                cc = userRepository.findById(userID);
-        if (cc.isPresent()) {
-            user = cc.get();
-            user.login = userDetails.login;
-            user.email = userDetails.email;
-            userRepository.save(user);
-            return ResponseEntity.ok(user);
-        } else {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "user not found");
-        }
-    }
-
 
     @PostMapping("/users/{id}/addmuseums")
-    @JsonView(View.Req.class)
     public ResponseEntity<Object> addMuseums(@PathVariable(value = "id") Long userId,
-                                             @Valid @RequestBody Set<Museum> museums) {
+                                             @RequestBody Set<Museum> museums) {
         Optional<User> uu = userRepository.findById(userId);
         int cnt = 0;
         if (uu.isPresent()) {
@@ -99,10 +100,7 @@ public class UserController {
             for (Museum m : museums) {
                 Optional<Museum>
                         mm = museumRepository.findById(m.id);
-                if (mm.isPresent()) {
-                    u.addMuseum(mm.get());
-                    cnt++;
-                }
+                mm.ifPresent(u::addMuseum);
             }
             userRepository.save(u);
         }
@@ -111,11 +109,9 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-
     @PostMapping("/users/{id}/removemuseums")
-    @JsonView(View.Req.class)
     public ResponseEntity<Object> removeMuseums(@PathVariable(value = "id") Long userId,
-                                                @Valid @RequestBody Set<Museum> museums) {
+                                                @RequestBody Set<Museum> museums) {
         Optional<User> uu = userRepository.findById(userId);
         int cnt = 0;
         if (uu.isPresent()) {
@@ -131,19 +127,13 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-
-    @DeleteMapping("/users/{id}")
-    public ResponseEntity<Object> deleteUser(@PathVariable(value = "id") Long userID) {
-        Optional<User>
-                user = userRepository.findById(userID);
-        Map<String, Boolean>
-                resp = new HashMap<>();
-        if (user.isPresent()) {
-            userRepository.delete(user.get());
-            resp.put("deleted", Boolean.TRUE);
-        }
-        else
-            resp.put("deleted", Boolean.FALSE);
-        return ResponseEntity.ok(resp);
+    @GetMapping("/users/{id}")
+    public ResponseEntity<User> getUser(@PathVariable(value = "id") Long userId)
+            throws DataValidationException
+    {
+        User artist = userRepository.findById(userId)
+                .orElseThrow(()-> new DataValidationException("Пользователь с таким индексом не найден"));
+        return ResponseEntity.ok(artist);
     }
+
 }

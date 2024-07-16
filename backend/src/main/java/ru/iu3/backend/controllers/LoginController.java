@@ -25,7 +25,6 @@ public class LoginController {
     private UserRepository userRepository;
 
     @PostMapping("/login")
-    @JsonView(View.Login.class)
     public ResponseEntity<Object> login(@RequestBody Map<String, String> credentials) {
         String login = credentials.get("login");
         String pwd = credentials.get("password");
@@ -41,7 +40,8 @@ public class LoginController {
                     u2.token = token;
                     u2.activity = LocalDateTime.now();
                     User u3 = userRepository.saveAndFlush(u2);
-                    return new ResponseEntity<Object>(u3, HttpStatus.OK);
+                    ResponseEntity<Object> response = new ResponseEntity<Object>(u3, HttpStatus.OK);
+                    return response;
                 }
             }
         }
